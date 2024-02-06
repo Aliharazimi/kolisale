@@ -1,0 +1,445 @@
+﻿@page "/transfer"
+@attribute [Authorize]
+@using System.Dynamic;
+@inject IAlertService AlertService
+@inject IUserService UserService
+@inject IAccountService AccountService
+@inject NavigationManager NavigationManager
+@using Yakhubi.Models
+@inject IHttpService HttpService
+@inject HttpClient Http
+@using System.Net.Http.Json
+@using System.Net.Http
+@using Newtonsoft.Json.Linq;
+@using Newtonsoft.Json;
+@using System.Text.Json
+@using System.Net.Http.Headers;
+@using RESTCountries.NET.Services;
+<h1>Transfer</h1>
+    <EditForm Model="@model" >
+    <DataAnnotationsValidator />
+@if(stage == 1)
+{
+            @* // From *@
+        <div class="form-group mb-4">
+                <label>
+                    From
+                    <em>(select your country)</em>
+                </label>
+                <div class="input-group">
+                    <span class="input-group-text" id="basic-addon1">
+                        <svg class="icon icon-xs text-info" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"></path><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"></path></svg>
+                    </span>
+                    <select class="form-control" @onchange="fetchSenderCurrency">
+                                @if (Countries != null)
+                                    {
+                                    <option value="">select...</option>
+                                    @foreach (var country in Countries)
+                                        {
+                                        <option value="@country.Name.Common">@country.Name.Common</option>
+                                        }
+                                    }
+                    </select>
+
+                    <ValidationMessage For="@(() => model.From)" />
+                </div>
+                
+        </div>
+             <div class="form-group mb-4">
+                <label>
+                    <em>(currency)</em>
+                </label>
+                <div>
+                    <div>Sender Country name: @SenderSelect</div>
+                    <div>Sender Country currency: @model.Src</div>
+                </div>    
+            </div>
+
+    <div class="form-group">
+            <button disabled="@loading" class="btn btn-primary mt-2" @onclick="@(() => StageHasChanged())">
+                @if (loading) 
+                {
+                    <span class="spinner-border spinner-border-sm mr-1"></span>
+                }
+                Continue
+            </button>
+            <NavLink href="" class="btn btn-link">Cancel</NavLink>
+    </div> 
+} else if (stage == 2)
+{
+            @* To *@
+            <div class="input-group">
+                    <span class="input-group-text" id="basic-addon1">
+                        <svg class="icon icon-xs text-info" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"></path><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"></path></svg>
+                    </span>
+                    <select class="form-control" @onchange="fetchRecipeintCurrency">
+                                @if (Countries != null)
+                                    {
+                                    <option value="">select...</option>
+                                    @foreach (var country in Countries)
+                                        {
+                                        <option value="@country.Name.Common">@country.Name.Common</option>
+                                        }
+                                    }
+                    </select>
+
+                    <ValidationMessage For="@(() => model.From)" />
+                </div>
+            <div class="form-group mb-4">
+                <label>
+                    <em>(currency)</em>
+                </label>
+                <div>
+                    <div>Recipient Country name: @RecipeintSelect</div>
+                    <div>Recipient Country currency: @model.Dst</div>
+                </div>    
+            </div>
+    <div class="form-group">
+            <button disabled="@loading" class="btn btn-primary mt-2" @onclick="@(() => StageHasChanged())">
+                @if (loading) 
+                {
+                    <span class="spinner-border spinner-border-sm mr-1"></span>
+                }
+                Continue
+            </button>
+            <NavLink href="" class="btn btn-link">Cancel</NavLink>
+    </div> 
+        
+} else if(stage == 3)
+{
+    @* methods *@
+            <div class="form-group mb-4">
+                
+                <label>
+                    To
+                    <em>(Amount)</em>
+                </label>
+                <div class="input-group">
+                    <span class="input-group-text" id="basic-addon1">
+                        <svg class="icon icon-xs text-info" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"></path><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"></path></svg>
+                    </span>
+                    <input type="text" class="form-control" autofocus placeholder="Enter amount in your currency" @onchange="FetchExRate">
+                    <ValidationMessage For="@(() => model.Amount)" />
+                </div>
+                
+            </div>
+            @if (ExchangeRate != null)
+            {
+                <div class="form-group mb-4">
+                
+                <label>
+                    To
+                    <em>(exchange)</em>
+                </label>
+                <div class="input-group">
+                    result: @ExchangeRate.Result
+                    rate: @ExchangeRate.conversion_rate
+                    amount of rate: @ExchangeRate.conversion_result
+                </div>
+                
+            </div>
+            }
+            
+            
+            <div class="form-group mb-4">
+                <label>
+                    To
+                    <em>(select bank of Recipient)</em>
+                </label>
+                <div class="input-group">
+                    <span class="input-group-text" id="basic-addon1">
+                        <svg class="icon icon-xs text-info" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"></path><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"></path></svg>
+                    </span>
+                    <InputText class="form-control" autofocus @bind-Value="model.Method" type="text" placeholder="Enter Reciever's bank name" />
+                    <ValidationMessage For="@(() => model.Method)" />
+                </div> 
+            </div>
+            <div class="form-group mb-4">
+                <label>Recipient Account Number</label>
+                <div class="input-group">
+                    <span class="input-group-text" id="basic-addon1">
+                        <svg class="icon icon-xs text-info" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"></path><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"></path></svg>
+                    </span>
+                    <InputText @bind-Value="model.RecipientId" class="form-control" autofocus />
+                    <ValidationMessage For="@(() => model.RecipientId)" />
+                </div>  
+            </div>
+            <div class="form-group mb-4">
+                <label>Recipient Account Name</label>
+                <div class="input-group">
+                    <span class="input-group-text" id="basic-addon1">
+                        <svg class="icon icon-xs text-info" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"></path><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"></path></svg>
+                    </span>
+                    <InputText @bind-Value="model.RecipientName" class="form-control" autofocus />
+                    <ValidationMessage For="@(() => model.RecipientName)" />
+                </div>  
+            </div>
+    <div class="form-group">
+            <button disabled="@loading" class="btn btn-primary mt-2" @onclick="@(() => StageHasChanged())">
+                @if (loading) 
+                {
+                    <span class="spinner-border spinner-border-sm mr-1"></span>
+                }
+                Continue
+            </button>
+            <NavLink href="" class="btn btn-link">Cancel</NavLink>
+    </div> 
+} else
+{
+  <!-- Form -->
+        
+         <div class="form-row">
+            <div class="form-group col">
+                <label>Recipient Email
+                    <span>(optional)</span>
+                </label>
+                <InputText @bind-Value="model.RecipientMail" class="form-control" />
+                <ValidationMessage For="@(() => model.RecipientMail)" />
+            </div>
+            <div class="form-group col">
+                <label>Recipient Phone
+                    <span>(optional)</span>
+                </label>
+                <InputText @bind-Value="model.RecipientPhone" class="form-control" />
+                <ValidationMessage For="@(() => model.RecipientPhone)" />
+            </div>
+            <div class="form-group col">
+                <label>Recipient Address
+                    <span>(optional)</span>
+                </label>
+                <InputText @bind-Value="model.RecipientAddress" class="form-control" />
+                <ValidationMessage For="@(() => model.RecipientAddress)" />
+            </div>
+
+        </div>
+        
+
+        
+        <div class="form-group">
+            <button disabled="@loading" class="btn btn-primary mt-2" @onclick="@(() => OnValidSubmit())">
+                @if (loading) 
+                {
+                    <span class="spinner-border spinner-border-sm mr-1"></span>
+                }
+                Submit
+            </button>
+            <NavLink href="" class="btn btn-link">Cancel</NavLink>
+        </div>  
+}
+        
+    </EditForm>
+
+@code
+{
+ public class Exchange
+ {
+    public string Result { get; set; }
+    [JsonProperty("base_code")]
+    public string BaseCode { get; set; }
+    [JsonProperty("target_code")]
+    public string TargetCode { get; set; }
+    [JsonProperty("conversion_rate")]
+    public decimal conversion_rate { get; set; }
+    [JsonProperty("conversion_result")]
+    public decimal conversion_result { get; set; }
+ }
+    int stage = 1;
+    private Transaction model = new Transaction();
+    private bool loading;
+    [Parameter]
+    public string Id { get; set; }
+    public string Currency { get; set; }
+    
+    public string SenderSelect { get; set; }
+    public string RecipeintSelect { get; set; }
+    //public dynamic selectedCountry;
+    
+
+    @* public string response { get; set; } *@
+    IEnumerable<Transaction> transactions;
+    IEnumerable<Country> Countries;
+    Exchange ExchangeRate;
+    IEnumerable<Method> Methods;
+     protected override async Task OnInitializedAsync()
+    {
+      try
+      {
+
+        @* string ip = System.Web.HttpContext.Current.Request.ServerVariables["HTTP_X_FORWARDED_FOR"];
+        if (string.IsNullOrEmpty(ip))
+        {
+        ip = System.Web.HttpContext.Current.Request.ServerVariables["REMOTE_ADDR"];
+        } *@
+        //Console.WriteLine(ip);
+          @* Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccountService.User.Token); *@
+          @* transactions = await Http.GetFromJsonAsync<IEnumerable<Transaction>>("https://ykb.insolify.com/transactions"); *@
+          Countries = await Http.GetFromJsonAsync<IEnumerable<Country>>("https://restcountries.com/v3.1/region/africa");
+          @* selectedCount = await Http.GetFromJsonAsync<IEnumerable<Country>>("https://restcountries.com/v3.1/name/@selectedCountry?fullText=true"); *@
+//        var task = Http.GetAsync("https://restcountries.com/v3.1/region/africa");
+//        HttpResponseMessage result = task.Result;
+//        if (result.IsSuccessStatusCode)
+//        {
+//            Task<string> readString = result.Content.ReadAsStringAsync();
+//            string jsonString = readString.Result;
+//            var Countries = Country.FromJson(jsonString).GetType();
+//            Console.WriteLine(Countries);
+//
+//        }
+//        @* Currencies = await Http.GetFromJsonAsync<IEnumerable<Currency>>("https://ykb.insolify.com/transactions");  *@
+//        Methods = await Http.GetFromJsonAsync<IEnumerable<Method>>("https://ykb.insolify.com/transactions"); 
+      }
+      catch (HttpRequestException exc)
+      {
+        Console.WriteLine(exc);
+      }
+    } 
+    private async Task fetchSenderCurrency(ChangeEventArgs e)
+    {
+    // Assign the selected value to the Model 
+    SenderSelect = e.Value.ToString();
+    model.From = e.Value.ToString();
+    try
+    {
+        @* selectedCountry = await Http.GetFromJsonAsync<Country>("https://restcountries.com/v3.1/name/"+select); *@
+    HttpResponseMessage response = await Http.GetAsync("https://restcountries.com/v3.1/name/"+SenderSelect);
+    response.EnsureSuccessStatusCode();
+    string responseBody = await response.Content.ReadAsStringAsync();
+    dynamic selectedCountry = JArray.Parse(responseBody);
+    foreach (JObject item in selectedCountry)
+    {
+        var currencies = item.GetValue("currencies").ToString();
+        JObject obj = JsonConvert.DeserializeObject < JObject>(currencies);
+        var properties = obj.Properties();
+        foreach (var prop in properties)
+        {
+            string key = prop.Name;
+            dynamic value = prop.Value;
+            var name = value["name"];
+            model.Src = key;
+            
+        }
+       
+    }
+    }
+    catch (System.Exception exp)
+    {
+        
+        Console.WriteLine(exp);
+    }
+    
+    
+    } 
+ private async Task fetchRecipeintCurrency(ChangeEventArgs e)
+    {
+    // Assign the selected value to the Model 
+    RecipeintSelect = e.Value.ToString();
+    model.To = e.Value.ToString();
+    try
+    {
+        @* selectedCountry = await Http.GetFromJsonAsync<Country>("https://restcountries.com/v3.1/name/"+select); *@
+    HttpResponseMessage response = await Http.GetAsync("https://restcountries.com/v3.1/name/"+RecipeintSelect);
+    response.EnsureSuccessStatusCode();
+    string responseBody = await response.Content.ReadAsStringAsync();
+    dynamic selectedCountry2 = JArray.Parse(responseBody);
+    foreach (JObject item in selectedCountry2)
+    {
+        var currencies = item.GetValue("currencies").ToString();
+        JObject obj = JsonConvert.DeserializeObject < JObject>(currencies);
+        var properties = obj.Properties();
+        foreach (var prop in properties)
+        {
+            string key = prop.Name;
+            dynamic value = prop.Value;
+            var name = value["name"];
+            model.Dst = key;
+            
+        }
+       
+    }
+    }
+    catch (System.Exception exp)
+    {
+        
+        Console.WriteLine(exp);
+    }
+    
+    
+    } 
+ private async Task FetchExRate(ChangeEventArgs e)
+    {
+    // Assign the selected value to the Model 
+    model.Amount = e.Value.ToString();
+    //string APIKEY = "a68856e8fe0e2e8db739a349";
+    try
+    {
+    ExchangeRate = await Http.GetFromJsonAsync<Exchange>("https://v6.exchangerate-api.com/v6/a68856e8fe0e2e8db739a349/pair/"+model.Src+"/"+model.Dst+"/"+model.Amount);
+    //HttpResponseMessage response = await Http.GetAsync("https://restcountries.com/v3.1/name/"+RecipeintSelect);
+    //response.EnsureSuccessStatusCode();
+    //string responseBody = await response.Content.ReadAsStringAsync();
+    // dynamic ExchangeRate = JArray.Parse(responseBody);
+    Console.WriteLine("reciever : " +ExchangeRate.conversion_rate);
+    Console.WriteLine("currency : "+ ExchangeRate.conversion_result);
+    
+    }
+    catch (System.Exception exp)
+    {
+        
+        Console.WriteLine(exp);
+    }
+    
+    
+    } 
+
+     public void StageHasChanged()
+    {
+        AlertService.Clear();
+        
+        loading = true;
+        try
+        {
+           
+            stage += 1;
+            loading = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            AlertService.Error(ex.Message);
+            loading = false;
+            StateHasChanged();
+        }
+    }
+    private async void OnValidSubmit()
+    {
+    AlertService.Clear();
+    loading = true;
+        try
+        {
+            @* model.DestinationCountry = value; *@
+            @* await UserService.Trans(model); *@
+            Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccountService.User.Token);
+            var response = await Http.PostAsJsonAsync("https://ykb.insolify.com/transactions", model);
+            AlertService.Info("please wait verifying your request", keepAfterRouteChange: true);
+            StateHasChanged();
+            
+            if (response.IsSuccessStatusCode)
+            {
+                AlertService.Info("Transfer successful", keepAfterRouteChange: true);
+                NavigationManager.NavigateTo("payment");
+            }else
+            {
+             AlertService.Error("failed to verify your request", keepAfterRouteChange: true);
+             StateHasChanged();
+             NavigationManager.NavigateTo("transfer");
+            }
+            
+        }
+        catch (Exception ex)
+        {
+            AlertService.Error(ex.Message);
+            loading = false;
+            StateHasChanged();
+        }
+        
+    }
+}

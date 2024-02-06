@@ -1,0 +1,148 @@
+﻿@page "/account/register"
+@inject IAccountService AccountService
+@inject IAlertService AlertService
+@inject NavigationManager NavigationManager
+@inject IUserService UserService
+@inject IHttpService HttpService
+@inject HttpClient Http
+@using System.Net.Http
+@if(SCode == 1)
+{
+<div class="card">
+    <h4 class="card-header">Register</h4>
+    <div class="card-body">
+        <EditForm Model="@model" OnValidSubmit="vOtp">
+            <DataAnnotationsValidator />
+            @* name *@
+            <div class="form-group">
+                <label>Full Name</label>
+                <InputText @bind-Value="model.Name" class="form-control" />
+                <ValidationMessage For="@(() => model.Name)" />
+            </div>
+            @* email *@
+            <div class="form-group">
+                <label>Email</label>
+                <InputText @bind-Value="model.Email" class="form-control" />
+                <ValidationMessage For="@(() => model.Email)" />
+            </div>
+            <div class="form-group">
+                <label>Phone Number</label>
+                <InputText @bind-Value="model.Phone" type="text" class="form-control" />
+                <ValidationMessage For="@(() => model.Phone)" />
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <InputText @bind-Value="model.Password" type="password" class="form-control" />
+                <ValidationMessage For="@(() => model.Password)" />
+            </div>
+            <button disabled="@loading" class="btn btn-primary mt-3">
+                @if (loading) 
+                {
+                    <span class="spinner-border spinner-border-sm mr-1"></span>
+                }
+                Register
+            </button>
+            <NavLink href="account/login" class="btn btn-link">Cancel</NavLink>
+        </EditForm>
+    </div>
+</div>
+}
+else if(SCode == 2)
+{
+<div class="card">
+    <h4 class="card-header">OTP Verification</h4>
+    <div class="card-body">
+        <EditForm Model="@model" OnValidSubmit="OnValidSubmit">
+            <DataAnnotationsValidator />
+            <div class="form-group">
+                <label>verify Code</label>
+                <InputText @bind-Value="model.Code" type="number" class="form-control" />
+                @* <ValidationMessage For="@(() => model.Password)" /> *@
+            </div>
+            <button disabled="@loading" class="btn btn-primary mt-3">
+                @if (loading) 
+                {
+                    <span class="spinner-border spinner-border-sm mr-1"></span>
+                }
+                verify Code
+            </button>
+            <NavLink href="account/login" class="btn btn-link">Cancel</NavLink>
+        </EditForm>
+    </div>
+</div>
+}
+
+@code
+{
+    int SCode = 1;
+    private User model = new User();
+    private bool loading;
+    @* IEnumerable<Country> Countries;
+    IEnumerable<Currency> Currencies;
+    IEnumerable<Method> Methods;
+     protected override async Task OnInitializedAsync()
+    {
+      try
+      {
+        Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccountService.User.Token);
+        Countries = await Http.GetFromJsonAsync<IEnumerable<Country>>("https://ykb.insolify.com/countries");
+        Currencies = await Http.GetFromJsonAsync<IEnumerable<Currency>>("https://ykb.insolify.com/transactions");
+      }
+      catch (HttpRequestException exc)
+      {
+        
+        Console.WriteLine(exc);
+      }
+    }  *@
+
+
+    private async void vOtp()
+    {
+        // reset alerts on submit
+        AlertService.Clear();
+        
+        loading = true;
+        try
+        {
+            await AccountService.vOtp(model);
+            SCode = 2;
+            loading = false;
+            AlertService.Info("please verify the OTP send to you.", keepAfterRouteChange: true);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            AlertService.Error(ex.Message);
+            loading = false;
+            StateHasChanged();
+        }
+       
+    }
+    
+    private async void OnValidSubmit()
+    {
+    AlertService.Clear();
+        
+    loading = true;
+    if(model.Code != null)
+     {
+
+        try
+        {
+            
+            await AccountService.Register(model);
+            AlertService.Info("Registration successful", keepAfterRouteChange: true);
+            NavigationManager.NavigateTo("account/login");
+            
+            
+        }
+        catch (Exception ex)
+        {
+            AlertService.Error(ex.Message);
+            loading = false;
+            StateHasChanged();
+        }
+        
+     }
+    }
+}
